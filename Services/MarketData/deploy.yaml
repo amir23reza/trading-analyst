@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-data
+  namespace: trade
+  labels:
+    app: market-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: market-data
+  template:
+    metadata:
+      labels:
+        app: market-data
+    spec:
+      containers:
+        - name: market-data
+          # Match your local build tag 
+          # (e.g., sudo docker build -t localhost:5001/market-data:latest .)
+          # sudo docker push localhost:5001/market-data:latest
+          image: localhost:5001/market-data:latest
+          # Forces k3s to use the locally imported image without trying to pull from Docker Hub
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-data-service
+  namespace: trade
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+  selector:
+    app: market-data
