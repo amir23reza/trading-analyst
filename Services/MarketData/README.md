@@ -5,7 +5,8 @@ Fetches **daily** stock bars from Yahoo Finance, stores them durably in MSSQL, a
 ### Folder structure
 ```
 |_app
-
+  _api (holds all the api end points and incoming request processing)
+  _domain (holds the models)
 |_db
 
 |_tests
@@ -61,6 +62,38 @@ When to Use It
 • Constants or configuration models: When the data should remain fixed for the lifetime of the object.
 
 • Dictionary keys / Set items: When you need a custom composite key that requires hashing.
+
+---
+#### from \_\_future\_\_ import annotations
+This tells Python: “when the code is parsed, don’t evaluate type annotations immediately; treat them as postponed strings.”
+
+Without it, this can fail:
+
+```
+class A:
+    b: B
+
+class B:
+    pass
+```
+
+because B is not defined yet when A is created.
+
+---
+#### from typing import Protocol
+A Protocol lets you define an interface based on what an object can do (its methods and attributes).
+
+primarily used with static type checkers that recognize structural subtyping (static duck-typing).
+
+In this project, and generally in Python, we use Protocols to create contracts.
+
+---
+#### Contracts
+
+A code contract specifies what a component expects from the outside world and what it guarantees in return.
+
+If you come from languages like Java or C#, a Protocol serves the exact same architectural purpose as an Interface. The only difference is that Python's version is "implicit"—if an object looks like the interface and acts like the interface, Python considers the contract signed and honored.
+
 
 ---
 #### pyproject.toml
@@ -151,5 +184,3 @@ Inserts a new record if it does not exist or updates the existing record if it d
 An error-handling strategy where a system repeatedly attempts a failed operation (like a network call or database query) with an increasing time delay between each try. Typically, the wait time doubles or multiplies with each failure
 
 ---
-
-
