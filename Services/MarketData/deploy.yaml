@@ -17,10 +17,8 @@ spec:
     spec:
       containers:
         - name: market-data
-          # Match your local build tag 
-          # (e.g., sudo docker build -t localhost:5001/market-data:latest .)
-          # sudo docker push localhost:5001/market-data:latest
-          image: localhost:5001/market-data:latest
+          # build_deploy.sh updates this to the pushed timestamped image.
+          image: localhost:5001/market-data:20261111T214852618616573Z
           # Forces k3s to use the locally imported image without trying to pull from Docker Hub
           imagePullPolicy: IfNotPresent
           ports:

@@ -43,12 +43,14 @@ mirrors:
 #step 4
 sudo systemctl restart k3s
 
-#repeating steps for development:
-sudo docker build -t localhost:5001/market-data:latest .
-sudo docker push localhost:5001/market-data:latest
-./deploy.sh
+# Build and push a UTC timestamp-tagged image, update deploy.yaml, and deploy:
+./build_deploy.sh
 
 ```
+
+After deployment succeeds, `build_deploy.sh` removes older local Docker tags for
+`localhost:5001/market-data`. This does not delete images already stored in the
+registry or cached by Kubernetes nodes; registry cleanup is a separate operation.
 
 ### Concepts to Learn
 ---
