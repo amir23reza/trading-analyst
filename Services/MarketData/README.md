@@ -24,29 +24,29 @@ pyproject.toml
 
 #### How to tag and push docker images locally (with k3s)
 
-```
-step 1
+```sh
+#step 1
 sudo docker run -d \
   --name local-registry \
   --restart=always \
   -p 5001:5000 \
   registry:2
 
-step 2
+#step 2
 sudo vim /etc/rancher/k3s/registries.yaml
-step 3 > paste the below block
+#step 3 > paste the below block
 mirrors:
   "localhost:5001":
     endpoint:
       - "http://localhost:5001"
 
-step 4
+#step 4
 sudo systemctl restart k3s
 
-repeating steps for development:
+#repeating steps for development:
 sudo docker build -t localhost:5001/market-data:latest .
 sudo docker push localhost:5001/market-data:latest
-kubectl rollout restart deployment market-data
+./deploy.sh
 
 ```
 
@@ -69,7 +69,7 @@ This tells Python: “when the code is parsed, don’t evaluate type annotations
 
 Without it, this can fail:
 
-```
+```python
 class A:
     b: B
 
@@ -94,6 +94,63 @@ A code contract specifies what a component expects from the outside world and wh
 
 If you come from languages like Java or C#, a Protocol serves the exact same architectural purpose as an Interface. The only difference is that Python's version is "implicit"—if an object looks like the interface and acts like the interface, Python considers the contract signed and honored.
 
+---
+#### Python Decorators
+
+A decorator in Python is a design pattern that allows you to modify or extend the behavior of a function, method, or class without changing its actual source code
+
+```python
+# 1. Define the decorator
+def my_decorator(func):
+    def wrapper():
+        print("Something is happening BEFORE the function is called.")
+        func()  # Executes the original function
+        print("Something is happening AFTER the function is called.")
+    return wrapper
+
+# 2. Apply the decorator using the '@' syntax
+@my_decorator
+def say_hello():
+    print("Hello, World!")
+
+# 3. Call the function
+say_hello()
+```
+
+result:
+```
+Something is happening BEFORE the function is called.
+Hello, World!
+Something is happening AFTER the function is called.
+```
+
+---
+#### pydantic settings
+Using Pydantic Settings alongside Kubernetes YAML is the industry standard for cloud-native Python applications.
+
+Pydantic Settings can automatically scan the container's environment variables at startup, validate the data types, and instantiate a type-safe settings object.
+
+python config.py file
+
+```python
+from pydantic_settings import BaseSettings
+from pydantic import Field
+
+class AppSettings(BaseSettings):
+    # Field targets standard Kubernetes env naming conventions
+    db_host: str = Field(validation_alias="DB_HOST")
+
+settings = AppSettings()
+```
+
+deployment.yaml file:
+```yaml
+- name: DB_HOST
+    valueFrom:
+      secretKeyRef:
+        name: app-secret
+        key: db_host
+```
 
 ---
 #### pyproject.toml

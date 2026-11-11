@@ -25,6 +25,32 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
+          env:
+            - name: APP_NAME
+              value: "MarketData"
+            - name: APP_VERSION
+              value: "0.1.0"
+            - name: DB_HOST
+              value: mssql-service
+            - name: DB_PORT
+              value: "1433"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_NAME
+            - name: DISPATCHER_ENABLED
+              value: "true"
 ---
 apiVersion: v1
 kind: Service
@@ -39,3 +65,124 @@ spec:
       protocol: TCP
   selector:
     app: market-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mssql-service
+  namespace: trade
+spec:
+  selector:
+    app: mssql
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: market-data-mssql
+  namespace: trade
+spec:
+  serviceName: "mssql-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mssql
+  template:
+    metadata:
+      labels:
+        app: mssql
+    spec:
+      securityContext:
+        fsGroup: 10001 # Required for SQL Server container file permissions
+      containers:
+        - name: mssql
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          ports:
+            - containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_PID
+              value: "Developer"
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: SA_PASSWORD
+          volumeMounts:
+            - name: mssql-data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: mssql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: market-data-mssql-init-job
+  namespace: trade
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mssql-init
+          image: mcr.microsoft.com/mssql/server:2022-latest
+          env:
+            - name: SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: SA_PASSWORD
+            - name: DB_HOST
+              value: mssql-service
+            - name: DB_PORT
+              value: "1433"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-mssql-secrets
+                  key: DB_PASSWORD
+          command:
+            - /bin/bash
+            - -c
+            - |
+              until /opt/mssql-tools18/bin/sqlcmd -S "$DB_HOST,$DB_PORT" -U sa -P "$SA_PASSWORD" -C -Q "SELECT 1" > /dev/null 2>&1; do
+                echo "Waiting for SQL Server to be ready..."
+                sleep 5
+              done
+
+              /opt/mssql-tools18/bin/sqlcmd -S "$DB_HOST,$DB_PORT" -U sa -P "$SA_PASSWORD" -C -Q "
+              IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = '$DB_NAME')
+              BEGIN
+                CREATE DATABASE [$DB_NAME];
+              END;
+              USE [$DB_NAME];
+              IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = '$DB_USER')
+              BEGIN
+                CREATE LOGIN [$DB_USER] WITH PASSWORD = '$DB_PASSWORD';
+              END;
+              IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = '$DB_USER')
+              BEGIN
+                CREATE USER [$DB_USER] FOR LOGIN [$DB_USER];
+                ALTER ROLE db_owner ADD MEMBER [$DB_USER];
+              END;
+              "
